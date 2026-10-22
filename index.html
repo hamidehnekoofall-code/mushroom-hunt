@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<title>🐺 شکار قارچ</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Tahoma,sans-serif;background:#0f172a;color:#e2e8f0;height:100vh;overflow:hidden}
+.screen{display:none;height:100vh;padding:24px;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+.screen.active{display:flex}
+h1{font-size:28px;margin-bottom:16px}
+h2{font-size:42px;color:#38bdf8;letter-spacing:8px}
+input{padding:12px 16px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:16px;width:240px;text-align:center}
+input:focus{outline:2px solid #38bdf8}
+button{padding:12px 24px;border-radius:8px;border:none;background:#38bdf8;color:#0f172a;font-size:16px;font-weight:bold;cursor:pointer;min-width:140px}
+button:hover{background:#0ea5e9}
+button:disabled{opacity:0.5;cursor:not-allowed}
+#avatarPicker{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:320px}
+.avatar-opt{font-size:24px;padding:8px;min-width:48px;background:#1e293b;color:#e2e8f0}
+.avatar-opt.selected{background:#38bdf8;color:#0f172a;transform:scale(1.1)}
+.join-row{display:flex;gap:8px;margin-top:16px}
+.join-row input{width:120px}
+.error{color:#f87171;font-size:14px;min-height:20px}
+#playerList{list-style:none;max-width:320px;width:100%}
+#playerList li{padding:8px 12px;background:#1e293b;margin:4px 0;border-radius:6px}
+#screen-game{padding:0}
+#map{width:100%;height:100vh}
+#hud{position:absolute;top:12px;left:12px;right:12px;display:flex;gap:8px;z-index:1000}
+#hud span{background:rgba(15,23,42,0.9);padding:6px 12px;border-radius:20px;font-size:13px;border:1px solid #334155}
+</style>
+</head>
+<body>
+<div id="screen-home" class="screen active">
+<h1>🐺 شکار قارچ</h1>
+<input id="nameInput" placeholder="اسمت چیه؟" maxlength="12" />
+<div id="avatarPicker">
+<button class="avatar-opt" data-emoji="🐺">🐺</button>
+<button class="avatar-opt" data-emoji="🐑">🐑</button>
+<button class="avatar-opt" data-emoji="🦊">🦊</button>
+<button class="avatar-opt" data-emoji="🐻">🐻</button>
+<button class="avatar-opt" data-emoji="🐯">🐯</button>
+<button class="avatar-opt" data-emoji="🐼">🐼</button>
+<button class="avatar-opt" data-emoji="🦁">🦁</button>
+<button class="avatar-opt" data-emoji="🐸">🐸</button>
+</div>
+<button id="createBtn">🎮 ساخت اتاق</button>
+<div class="join-row">
+<input id="codeInput" placeholder="کد ۴ رقمی" inputmode="numeric" maxlength="4" />
+<button id="joinBtn">ورود</button>
+</div>
+<p id="errorMsg" class="error"></p>
+</div>
+<div id="screen-lobby" class="screen">
+<p>کد اتاق شما:</p>
+<h2 id="roomCode">----</h2>
+<p>این کد را به دوستانتان بدهید</p>
+<ul id="playerList"></ul>
+<button id="startBtn">شروع بازی</button>
+</div>
+<div id="screen-game" class="screen">
+<div id="map"></div>
+<div id="hud">
+<span id="roleBadge">—</span>
+<span id="roundBadge">دور ۰</span>
+<span id="scoreBadge">امتیاز: ۰</span>
+</div>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+const ROOM_PREFIX='mq-v1-';
+class Network{
+constructor(){this.peer=null;this.conns=[];this.hostConn=null;this.isHost=false;this.playerId=null;this.handlers={}}
+on(e,cb){(this.handlers[e]||=[]).push(cb)}
+emit(e,d){(this.handlers[e]||[]).forEach(cb=>cb(d))}
+createRoom(){this.isHost=true;return new Promise((res,rej)=>{const tryCode=(att=0)=>{if(att>5)return rej(new Error('no code'));const code=String(Math.floor(1000+Math.random()*9000));const peer=new Peer(ROOM_PREFIX+code);let s=false;peer.on('open',id=>{if(s)return;s=true;this.peer=peer;this.playerId=id;this.setupHostHandlers();res(code)});peer.on('error',err=>{if(s)return;if(err.type==='unavailable-id'){peer.destroy();tryCode(att+1)}else{s=true;rej(err)}})};tryCode()})}
+setupHostHandlers(){this.peer.on('connection',conn=>{this.conns.push(conn);conn.on('data',msg=>this.emit('host-data',{from:conn.peer,data:msg}));conn.on('close',()=>{this.conns=this.conns.filter(c=>c!==conn);this.emit('player-left',conn.peer)})})}
+broadcast(msg){for(const c of this.conns)if(c.open)c.send(msg)}
+joinRoom(code){this.isHost=false;return new Promise((res,rej)=>{this.peer=new Peer();let opened=false,s=false;const fail=m=>{if(s)return;s=true;rej(new Error(m))};this.peer.on('open',id=>{opened=true;this.playerId=id;const conn=this.peer.connect(ROOM_PREFIX+code,{reliable:true});this.hostConn=conn;const timer=setTimeout(()=>fail('host timeout'),12000);conn.on('open',()=>{if(s)return;s=true;clearTimeout(timer);res()});conn.on('data',msg=>this.emit('host-message',msg));conn.on('close',()=>this.emit('host-closed'))});this.peer.on('error',err=>{if(!opened)fail('server fail');else if(err.type==='peer-unavailable')fail('room not found');else fail(err.message||'error')})})}
+sendToHost(msg){if(this.hostConn?.open)this.hostConn.send(msg)}
+}
+class Geo{
+constructor(){this.position=null;this.watchId=null}
+start(onUpdate){return new Promise((res,rej)=>{if(!navigator.geolocation)return rej(new Error('no gps'));this.watchId=navigator.geolocation.watchPosition(pos=>{this.position={lat:pos.coords.latitude,lng:pos.coords.longitude,t:Date.now()};onUpdate(this.position);res()},err=>rej(new Error('gps: '+err.message)),{enableHighAccuracy:true,maximumAge:1000,timeout:15000})})}
+static distance(a,b){const R=6371000;const dLat=(b.lat-a.lat)*Math.PI/180;const dLng=(b.lng-a.lng)*Math.PI/180;const x=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;return 2*R*Math.asin(Math.sqrt(x))}
+}
+class GameEngine{
+constructor(network,onState){this.net=network;this.onState=onState;this.players=new Map();this.state='lobby';this.round=0;this.wolfId=null;network.on('host-data',({from,data})=>this.onPlayerMessage(from,data));network.on('player-left',id=>{this.players.delete(id);this.broadcastState()});setInterval(()=>this.tick(),1000);setInterval(()=>this.broadcastState(),1000)}
+onPlayerMessage(from,msg){if(msg.type==='join'){this.players.set(from,{id:from,name:msg.name,emoji:msg.emoji,pos:null,role:'sheep',score:0});this.broadcastState()}else if(msg.type==='pos'){const p=this.players.get(from);if(p)p.pos=msg.pos}}
+start(){this.state='playing';this.round=1;const ids=[...this.players.keys()];this.wolfId=ids[Math.floor(Math.random()*ids.length)];for(const p of this.players.values()){p.role=p.id===this.wolfId?'wolf':'sheep';p.score=0}this.broadcastState()}
+tick(){if(this.state!=='playing')return;const wolf=this.players.get(this.wolfId);if(!wolf?.pos)return;for(const p of this.players.values()){if(p.id===this.wolfId||!p.pos)continue;const d=Geo.distance(wolf.pos,p.pos);if(d<25){wolf.score+=10;this.state='round-end';this.broadcastState();setTimeout(()=>this.nextRound(),5000);return}}}
+nextRound(){if(this.round>=3){this.state='game-over';this.broadcastState();return}this.round++;this.state='playing';const ids=[...this.players.keys()];this.wolfId=ids[Math.floor(Math.random()*ids.length)];for(const p of this.players.values())p.role=p.id===this.wolfId?'wolf':'sheep';this.broadcastState()}
+broadcastState(){const out={};for(const[id,p]of this.players)out[id]={name:p.name,emoji:p.emoji,pos:p.pos,role:p.role,score:p.score};const payload={type:'state',phase:this.state,round:this.round,players:out,wolfId:this.wolfId};this.net.broadcast(payload);if(this.onState)this.onState(payload)}
+}
+const net=new Network();const geo=new Geo();let engine=null;let map=null;let myMarker=null;const markers=new Map();let selectedEmoji='🐺';
+document.querySelectorAll('.avatar-opt').forEach(btn=>{if(btn.dataset.emoji==='🐺')btn.classList.add('selected');btn.onclick=()=>{document.querySelectorAll('.avatar-opt').forEach(b=>b.classList.remove('selected'));btn.classList.add('selected');selectedEmoji=btn.dataset.emoji}});
+function showScreen(name){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById('screen-'+name).classList.add('active')}
+function showError(msg){const el=document.getElementById('errorMsg');el.textContent=msg;setTimeout(()=>{if(el.textContent===msg)el.textContent=''},5000)}
+async function startGeo(){try{await geo.start(pos=>{if(engine){const me=engine.players.get(net.playerId);if(me)me.pos=pos}else{net.sendToHost({type:'pos',pos})}updateMyMarker(pos)})}catch(err){showError(err.message)}}
+function updateMyMarker(pos){if(!map)return;if(!myMarker){myMarker=L.marker([pos.lat,pos.lng],{icon:playerIcon('📍')}).addTo(map);map.setView([pos.lat,pos.lng],18)}else myMarker.setLatLng([pos.lat,pos.lng])}
+function playerIcon(emoji){return L.divIcon({html:`<div style="font-size:28px;text-align:center;line-height:1">${emoji}</div>`,className:'',iconSize:[32,32],iconAnchor:[16,16]})}
+function updateLobby(state){const list=document.getElementById('playerList');if(!list)return;list.innerHTML='';for(const[id,p]of Object.entries(state.players)){const li=document.createElement('li');li.textContent=`${p.emoji} ${p.name}${id===net.playerId?' (شما)':''}`;list.appendChild(li)}}
+function handleState(state){if(state.phase==='lobby'){updateLobby(state);return}const gameScreen=document.getElementById('screen-game');if(!gameScreen.classList.contains('active'))return;if(!map){map=L.map('map',{zoomControl:false}).setView([35.7,51.4],17);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);if(geo.position)map.setView([geo.position.lat,geo.position.lng],18);setTimeout(()=>map.invalidateSize(),100)}const me=state.players[net.playerId];if(me){document.getElementById('roleBadge').textContent=me.role==='wolf'?'🐺 گرگ':'🐑 بره';document.getElementById('scoreBadge').textContent=`امتیاز: ${me.score}`}document.getElementById('roundBadge').textContent=`دور ${state.round} — ${state.phase}`;const seen=new Set();for(const[id,p]of Object.entries(state.players)){if(!p.pos||id===net.playerId)continue;seen.add(id);if(markers.has(id))markers.get(id).setLatLng([p.pos.lat,p.pos.lng]);else{const m=L.marker([p.pos.lat,p.pos.lng],{icon:playerIcon(p.emoji)}).addTo(map).bindPopup(`${p.emoji} ${p.name} (${p.role})`);markers.set(id,m)}}for(const[id,m]of markers)if(!seen.has(id)){map.removeLayer(m);markers.delete(id)}}
+net.on('host-message',msg=>{if(msg.type==='state')handleState(msg)});net.on('host-closed',()=>{alert('اتصال قطع شد');location.reload()});
+document.getElementById('createBtn').onclick=async()=>{const name=document.getElementById('nameInput').value.trim()||'بازیکن';document.getElementById('createBtn').disabled=true;try{const code=await net.createRoom();document.getElementById('roomCode').textContent=code;showScreen('lobby');engine=new GameEngine(net,handleState);engine.players.set(net.playerId,{id:net.playerId,name,emoji:selectedEmoji,pos:null,role:'sheep',score:0});startGeo()}catch(err){showError('خطا: '+err.message);document.getElementById('createBtn').disabled=false}};
+document.getElementById('joinBtn').onclick=async()=>{const code=document.getElementById('codeInput').value.trim();const name=document.getElementById('nameInput').value.trim()||'بازیکن';if(!/^\d{4}$/.test(code))return showError('کد باید ۴ رقم باشد');document.getElementById('joinBtn').disabled=true;try{await net.joinRoom(code);net.sendToHost({type:'join',name,emoji:selectedEmoji});showScreen('game');startGeo()}catch(err){showError('خطا: '+err.message);document.getElementById('joinBtn').disabled=false}};
+document.getElementById('startBtn').onclick=()=>{if(!engine)return;showScreen('game');engine.start()};
+</script>
+</body>
+</html>
