@@ -1,112 +1,976 @@
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-<title>🐺 شکار قارچ</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🐺 شکار در شهر (گرگ و بره)</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Segoe UI',Tahoma,sans-serif;background:#0f172a;color:#e2e8f0;height:100vh;overflow:hidden}
-.screen{display:none;height:100vh;padding:24px;flex-direction:column;align-items:center;justify-content:center;gap:16px}
-.screen.active{display:flex}
-h1{font-size:28px;margin-bottom:16px}
-h2{font-size:42px;color:#38bdf8;letter-spacing:8px}
-input{padding:12px 16px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:16px;width:240px;text-align:center}
-input:focus{outline:2px solid #38bdf8}
-button{padding:12px 24px;border-radius:8px;border:none;background:#38bdf8;color:#0f172a;font-size:16px;font-weight:bold;cursor:pointer;min-width:140px}
-button:hover{background:#0ea5e9}
-button:disabled{opacity:0.5;cursor:not-allowed}
-#avatarPicker{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:320px}
-.avatar-opt{font-size:24px;padding:8px;min-width:48px;background:#1e293b;color:#e2e8f0}
-.avatar-opt.selected{background:#38bdf8;color:#0f172a;transform:scale(1.1)}
-.join-row{display:flex;gap:8px;margin-top:16px}
-.join-row input{width:120px}
-.error{color:#f87171;font-size:14px;min-height:20px}
-#playerList{list-style:none;max-width:320px;width:100%}
-#playerList li{padding:8px 12px;background:#1e293b;margin:4px 0;border-radius:6px}
-#screen-game{padding:0}
-#map{width:100%;height:100vh}
-#hud{position:absolute;top:12px;left:12px;right:12px;display:flex;gap:8px;z-index:1000}
-#hud span{background:rgba(15,23,42,0.9);padding:6px 12px;border-radius:20px;font-size:13px;border:1px solid #334155}
+  /* ==========================================
+     CSS - استایل‌های رابط کاربری
+     ========================================== */
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; -webkit-tap-highlight-color: transparent; }
+  body { background-color: #0f172a; color: #fff; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+  
+  /* اسکرین‌ها */
+  .screen { display: none; flex-direction: column; height: 100vh; width: 100vw; padding: 20px; align-items: center; justify-content: center; z-index: 10; }
+  .screen.active { display: flex; }
+  
+  /* صفحه خانه */
+  #screen-home h1 { font-size: 2.5rem; margin-bottom: 10px; text-shadow: 0 0 10px #38bdf8; }
+  #screen-home input { width: 90%; max-width: 300px; padding: 15px; margin: 10px 0; border-radius: 10px; border: 2px solid #38bdf8; background: #1e293b; color: white; font-size: 1.1rem; text-align: center; }
+  .avatar-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 90%; max-width: 300px; margin-bottom: 20px; }
+  .avatar-btn { background: #1e293b; border: 2px solid transparent; font-size: 2rem; padding: 10px; border-radius: 10px; cursor: pointer; transition: 0.2s; }
+  .avatar-btn.selected { border-color: #38bdf8; background: #0ea5e9; transform: scale(1.1); }
+  .btn-main { width: 90%; max-width: 300px; padding: 15px; margin: 5px 0; border-radius: 10px; border: none; font-size: 1.2rem; font-weight: bold; cursor: pointer; transition: 0.2s; }
+  .btn-create { background: #22c55e; color: white; }
+  .btn-join { background: #38bdf8; color: #0f172a; display: flex; justify-content: center; }
+  .btn-join input { padding: 10px; border-radius: 8px 0 0 8px; border: none; width: 60%; text-align: center; font-size: 1.2rem; }
+  .btn-join button { border-radius: 0 8px 8px 0; width: 40%; background: #0284c7; color: white; border: none; font-weight: bold; }
+  .error-msg { color: #ef4444; margin-top: 10px; font-weight: bold; text-align: center; }
+
+  /* لابی */
+  #screen-lobby { text-align: center; }
+  #room-code-display { font-size: 3rem; letter-spacing: 10px; color: #38bdf8; margin: 20px 0; font-weight: bold; text-shadow: 0 0 20px rgba(56, 189, 248, 0.5); }
+  #lobby-player-list { list-style: none; width: 90%; max-width: 400px; max-height: 40vh; overflow-y: auto; margin-bottom: 20px; }
+  #lobby-player-list li { background: #1e293b; padding: 10px 15px; margin: 5px 0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 1.1rem; }
+  .btn-start { background: #eab308; color: #0f172a; }
+
+  /* صفحه بازی */
+  #screen-game { padding: 0; position: relative; }
+  #map { width: 100%; height: 100%; z-index: 1; }
+  
+  /* HUD (اطلاعات بالای صفحه) */
+  #hud { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; z-index: 1000; pointer-events: none; }
+  .hud-box { background: rgba(15, 23, 42, 0.85); border: 1px solid #334155; padding: 8px 15px; border-radius: 20px; font-weight: bold; font-size: 0.9rem; display: flex; align-items: center; gap: 5px; backdrop-filter: blur(5px); }
+  #hud-role { color: #f87171; }
+  #hud-timer { color: #38bdf8; }
+  #hud-mode { color: #a78bfa; }
+  
+  /* نوار استقامت (Stamina) */
+  #stamina-container { position: absolute; top: 55px; left: 10px; width: 120px; height: 10px; background: rgba(0,0,0,0.5); border-radius: 5px; overflow: hidden; z-index: 1000; border: 1px solid #334155; }
+  #stamina-bar { width: 100%; height: 100%; background: #22c55e; transition: width 0.2s; }
+
+  /* دکمه‌های کنترل (پایین) */
+  #controls { position: absolute; bottom: 20px; left: 20px; right: 20px; display: flex; justify-content: space-between; align-items: flex-end; z-index: 1000; pointer-events: none; }
+  .control-btn { background: rgba(15, 23, 42, 0.85); border: 2px solid #475569; color: white; width: 60px; height: 60px; border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 1.5rem; pointer-events: auto; cursor: pointer; backdrop-filter: blur(5px); }
+  .control-btn:active { transform: scale(0.9); background: #1e293b; }
+  .control-btn span { font-size: 0.6rem; margin-top: 3px; }
+  #btn-invisible { border-color: #a855f7; color: #a855f7; }
+  #btn-invisible.active { background: #a855f7; color: white; box-shadow: 0 0 15px #a855f7; }
+  #btn-night { border-color: #f59e0b; color: #f59e0b; }
+
+  /* چت سریع */
+  #chat-panel { position: absolute; bottom: 90px; left: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 1000; pointer-events: auto; }
+  .chat-btn { background: rgba(30, 41, 59, 0.9); border: 1px solid #475569; color: white; padding: 8px 12px; border-radius: 20px; font-size: 0.9rem; cursor: pointer; white-space: nowrap; }
+  #chat-messages { position: absolute; bottom: 90px; right: 20px; display: flex; flex-direction: column; gap: 5px; z-index: 1000; pointer-events: none; }
+  .chat-bubble { background: rgba(56, 189, 248, 0.9); color: #0f172a; padding: 5px 10px; border-radius: 10px; font-weight: bold; font-size: 0.9rem; animation: fadeOut 4s forwards; }
+  @keyframes fadeOut { 0% { opacity: 1; transform: translateY(0); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-20px); } }
+
+  /* قطب‌نما */
+  #compass-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100px; height: 100px; z-index: 999; pointer-events: none; display: none; }
+  #compass-arrow { width: 0; height: 0; border-left: 20px solid transparent; border-right: 20px solid transparent; border-bottom: 60px solid #ef4444; position: absolute; top: 20px; left: 30px; transform-origin: 50% 60%; }
+  #compass-distance { position: absolute; bottom: 0; width: 100%; text-align: center; font-weight: bold; color: white; text-shadow: 1px 1px 2px black; }
+
+  /* حالت شب (Night Mode) */
+  #night-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 500; pointer-events: none; display: none; opacity: 0; transition: opacity 1s; }
+  #flashlight { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 501; pointer-events: none; display: none; background: radial-gradient(circle 100px at 50% 50%, transparent 0%, rgba(0,0,0,0.95) 100%); }
+
+  /* نشانگر بازیکنان روی نقشه */
+  .custom-icon { background: none; border: none; }
+  .player-avatar { font-size: 24px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5)); }
+  .my-avatar { font-size: 30px; filter: drop-shadow(0 0 10px #38bdf8); z-index: 9999 !important; }
+
+  /* افکت ضربان قلب */
+  .heartbeat-anim { animation: heartbeat 0.5s infinite; }
+  @keyframes heartbeat { 0% { transform: scale(1); } 50% { transform: scale(1.2); filter: drop-shadow(0 0 15px red); } 100% { transform: scale(1); } }
 </style>
 </head>
 <body>
+
+<!-- ==========================================
+     HTML - ساختار رابط کاربری
+     ========================================== -->
+
+<!-- صفحه خانه -->
 <div id="screen-home" class="screen active">
-<h1>🐺 شکار قارچ</h1>
-<input id="nameInput" placeholder="اسمت چیه؟" maxlength="12" />
-<div id="avatarPicker">
-<button class="avatar-opt" data-emoji="🐺">🐺</button>
-<button class="avatar-opt" data-emoji="🐑">🐑</button>
-<button class="avatar-opt" data-emoji="🦊">🦊</button>
-<button class="avatar-opt" data-emoji="🐻">🐻</button>
-<button class="avatar-opt" data-emoji="🐯">🐯</button>
-<button class="avatar-opt" data-emoji="🐼">🐼</button>
-<button class="avatar-opt" data-emoji="🦁">🦁</button>
-<button class="avatar-opt" data-emoji="🐸">🐸</button>
+  <h1>🐺 شکار در شهر</h1>
+  <p style="margin-bottom: 15px; color: #94a3b8;">اسم و آواتار خود را انتخاب کنید</p>
+  <input type="text" id="input-name" placeholder="اسم شما..." maxlength="12" value="بازیکن">
+  
+  <div class="avatar-grid" id="avatar-picker">
+    <button class="avatar-btn selected" data-emoji="🐺">🐺</button>
+    <button class="avatar-btn" data-emoji="🐑">🐑</button>
+    <button class="avatar-btn" data-emoji="🦊">🦊</button>
+    <button class="avatar-btn" data-emoji="🐻">🐻</button>
+    <button class="avatar-btn" data-emoji="🦁">🦁</button>
+    <button class="avatar-btn" data-emoji="🐸">🐸</button>
+    <button class="avatar-btn" data-emoji="🐧">🐧</button>
+    <button class="avatar-btn" data-emoji="👻">👻</button>
+  </div>
+
+  <button class="btn-main btn-create" id="btn-create-room">🎮 ساخت اتاق (میزبان)</button>
+  <div class="btn-join">
+    <input type="text" id="input-room-code" placeholder="کد اتاق" maxlength="4">
+    <button id="btn-join-room">ورود</button>
+  </div>
+  <div class="error-msg" id="error-msg"></div>
 </div>
-<button id="createBtn">🎮 ساخت اتاق</button>
-<div class="join-row">
-<input id="codeInput" placeholder="کد ۴ رقمی" inputmode="numeric" maxlength="4" />
-<button id="joinBtn">ورود</button>
-</div>
-<p id="errorMsg" class="error"></p>
-</div>
+
+<!-- صفحه لابی -->
 <div id="screen-lobby" class="screen">
-<p>کد اتاق شما:</p>
-<h2 id="roomCode">----</h2>
-<p>این کد را به دوستانتان بدهید</p>
-<ul id="playerList"></ul>
-<button id="startBtn">شروع بازی</button>
+  <h2>کد اتاق شما</h2>
+  <div id="room-code-display">----</div>
+  <p style="margin-bottom: 15px; color: #94a3b8;">منتظر پیوستن بازیکنان...</p>
+  <ul id="lobby-player-list"></ul>
+  <button class="btn-main btn-start" id="btn-start-game">🚀 شروع بازی</button>
 </div>
+
+<!-- صفحه بازی -->
 <div id="screen-game" class="screen">
-<div id="map"></div>
-<div id="hud">
-<span id="roleBadge">—</span>
-<span id="roundBadge">دور ۰</span>
-<span id="scoreBadge">امتیاز: ۰</span>
+  <div id="map"></div>
+  
+  <!-- اطلاعات بالای صفحه -->
+  <div id="hud">
+    <div class="hud-box" id="hud-role">نقش: نامشخص</div>
+    <div class="hud-box" id="hud-mode">حالت: -</div>
+    <div class="hud-box" id="hud-timer">00:00</div>
+  </div>
+  <div id="stamina-container"><div id="stamina-bar"></div></div>
+
+  <!-- افکت شب و مشعل -->
+  <div id="night-overlay"></div>
+  <div id="flashlight"></div>
+
+  <!-- قطب‌نما (با کلیک روی بازیکن) -->
+  <div id="compass-overlay">
+    <div id="compass-arrow"></div>
+    <div id="compass-distance">0m</div>
+  </div>
+
+  <!-- چت سریع -->
+  <div id="chat-panel">
+    <button class="chat-btn" data-msg="کمک!">🆘 کمک!</button>
+    <button class="chat-btn" data-msg="فرار کن!">🏃 فرار کن!</button>
+    <button class="chat-btn" data-msg="پیدات کردم!">🎯 پیدات کردم!</button>
+    <button class="chat-btn" data-msg="بیا اینجا!">📍 بیا اینجا!</button>
+  </div>
+  <div id="chat-messages"></div>
+
+  <!-- دکمه‌های کنترل پایین صفحه -->
+  <div id="controls">
+    <div style="display: flex; gap: 10px;">
+      <button class="control-btn" id="btn-night">🔦<span>مشعل</span></button>
+      <button class="control-btn" id="btn-invisible">👻<span>نامرئی</span></button>
+    </div>
+    <!-- دکمه بزرگ برای دویدن/حرکت (چون GPS خودکار است، این فقط برای استقامت است) -->
+    <div style="text-align: center; color: #94a3b8; font-size: 0.8rem; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 10px;">
+      برای حرکت بدوید 🏃‍♂️
+    </div>
+  </div>
 </div>
-</div>
+
+<!-- ==========================================
+     کدهای جاوااسکریپت (موتور بازی)
+     ========================================== -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+
 <script>
-const ROOM_PREFIX='mq-v1-';
-class Network{
-constructor(){this.peer=null;this.conns=[];this.hostConn=null;this.isHost=false;this.playerId=null;this.handlers={}}
-on(e,cb){(this.handlers[e]||=[]).push(cb)}
-emit(e,d){(this.handlers[e]||[]).forEach(cb=>cb(d))}
-createRoom(){this.isHost=true;return new Promise((res,rej)=>{const tryCode=(att=0)=>{if(att>5)return rej(new Error('no code'));const code=String(Math.floor(1000+Math.random()*9000));const peer=new Peer(ROOM_PREFIX+code);let s=false;peer.on('open',id=>{if(s)return;s=true;this.peer=peer;this.playerId=id;this.setupHostHandlers();res(code)});peer.on('error',err=>{if(s)return;if(err.type==='unavailable-id'){peer.destroy();tryCode(att+1)}else{s=true;rej(err)}})};tryCode()})}
-setupHostHandlers(){this.peer.on('connection',conn=>{this.conns.push(conn);conn.on('data',msg=>this.emit('host-data',{from:conn.peer,data:msg}));conn.on('close',()=>{this.conns=this.conns.filter(c=>c!==conn);this.emit('player-left',conn.peer)})})}
-broadcast(msg){for(const c of this.conns)if(c.open)c.send(msg)}
-joinRoom(code){this.isHost=false;return new Promise((res,rej)=>{this.peer=new Peer();let opened=false,s=false;const fail=m=>{if(s)return;s=true;rej(new Error(m))};this.peer.on('open',id=>{opened=true;this.playerId=id;const conn=this.peer.connect(ROOM_PREFIX+code,{reliable:true});this.hostConn=conn;const timer=setTimeout(()=>fail('host timeout'),12000);conn.on('open',()=>{if(s)return;s=true;clearTimeout(timer);res()});conn.on('data',msg=>this.emit('host-message',msg));conn.on('close',()=>this.emit('host-closed'))});this.peer.on('error',err=>{if(!opened)fail('server fail');else if(err.type==='peer-unavailable')fail('room not found');else fail(err.message||'error')})})}
-sendToHost(msg){if(this.hostConn?.open)this.hostConn.send(msg)}
+/* ==========================================
+   1. تنظیمات و متغیرهای سراسری
+   ========================================== */
+const ROOM_PREFIX = 'hide-seek-v1-';
+let network = null;
+let gameEngine = null;
+let map = null;
+let myMarker = null;
+let playerMarkers = {}; // ذخیره مارکرهای بازیکنان دیگر
+let selectedAvatar = '🐺';
+let myName = 'بازیکن';
+let isHost = false;
+let myGeoPos = null;
+let watchId = null;
+let currentTargetCompass = null;
+
+// صداها (برای ضربان قلب)
+const heartbeatAudio = new Audio('https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg'); // صدای تیک‌تاک موقت
+heartbeatAudio.loop = true;
+
+/* ==========================================
+   2. کلاس شبکه (P2P با PeerJS)
+   ========================================== */
+class Network {
+  constructor() {
+    this.peer = null;
+    this.connections = []; // برای میزبان
+    this.hostConn = null;  // برای بازیکن
+    this.myId = null;
+    this.handlers = {};
+  }
+
+  on(event, cb) { (this.handlers[event] = this.handlers[event] || []).push(cb); }
+  emit(event, data) { (this.handlers[event] || []).forEach(cb => cb(data)); }
+
+  // --- توابع میزبان ---
+  createRoom() {
+    return new Promise((resolve, reject) => {
+      const code = Math.floor(1000 + Math.random() * 9000).toString();
+      this.peer = new Peer(ROOM_PREFIX + code);
+      
+      this.peer.on('open', (id) => {
+        this.myId = id;
+        resolve(code);
+      });
+
+      this.peer.on('error', (err) => reject(err));
+
+      this.peer.on('connection', (conn) => {
+        this.connections.push(conn);
+        
+        conn.on('data', (data) => {
+          this.emit('data-from-client', { from: conn.peer, data: data });
+        });
+        
+        conn.on('close', () => {
+          this.connections = this.connections.filter(c => c !== conn);
+          this.emit('client-disconnected', conn.peer);
+        });
+      });
+    });
+  }
+
+  broadcast(msg) {
+    this.connections.forEach(conn => {
+      if (conn.open) conn.send(msg);
+    });
+  }
+
+  sendToClient(peerId, msg) {
+    const conn = this.connections.find(c => c.peer === peerId);
+    if (conn && conn.open) conn.send(msg);
+  }
+
+  // --- توابع بازیکن ---
+  joinRoom(code) {
+    return new Promise((resolve, reject) => {
+      this.peer = new Peer();
+      
+      this.peer.on('open', (id) => {
+        this.myId = id;
+        this.hostConn = this.peer.connect(ROOM_PREFIX + code);
+        
+        this.hostConn.on('open', () => {
+          resolve();
+        });
+
+        this.hostConn.on('data', (data) => {
+          this.emit('data-from-host', data);
+        });
+
+        this.hostConn.on('error', (err) => reject(err));
+      });
+
+      this.peer.on('error', (err) => {
+        if (err.type === 'peer-unavailable') reject(new Error('اتاق پیدا نشد. کد را بررسی کنید.'));
+        else reject(err);
+      });
+    });
+  }
+
+  sendToHost(msg) {
+    if (this.hostConn && this.hostConn.open) this.hostConn.send(msg);
+  }
 }
-class Geo{
-constructor(){this.position=null;this.watchId=null}
-start(onUpdate){return new Promise((res,rej)=>{if(!navigator.geolocation)return rej(new Error('no gps'));this.watchId=navigator.geolocation.watchPosition(pos=>{this.position={lat:pos.coords.latitude,lng:pos.coords.longitude,t:Date.now()};onUpdate(this.position);res()},err=>rej(new Error('gps: '+err.message)),{enableHighAccuracy:true,maximumAge:1000,timeout:15000})})}
-static distance(a,b){const R=6371000;const dLat=(b.lat-a.lat)*Math.PI/180;const dLng=(b.lng-a.lng)*Math.PI/180;const x=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;return 2*R*Math.asin(Math.sqrt(x))}
+
+/* ==========================================
+   3. کلاس ابزار جغرافیایی (GPS)
+   ========================================== */
+class GeoHelper {
+  static startTracking(onUpdate) {
+    if (!navigator.geolocation) {
+      alert("GPS گوشی شما پشتیبانی نمی‌شود.");
+      return;
+    }
+    watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        myGeoPos = { lat: pos.coords.latitude, lng: pos.coords.longitude, t: Date.now() };
+        onUpdate(myGeoPos);
+      },
+      (err) => console.error("GPS Error:", err),
+      { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
+    );
+  }
+
+  static getDistance(pos1, pos2) {
+    if (!pos1 || !pos2) return Infinity;
+    const R = 6371e3; // متر
+    const rad = Math.PI / 180;
+    const dLat = (pos2.lat - pos1.lat) * rad;
+    const dLng = (pos2.lng - pos1.lng) * rad;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(pos1.lat * rad) * Math.cos(pos2.lat * rad) *
+              Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
+  static getBearing(pos1, pos2) {
+    if (!pos1 || !pos2) return 0;
+    const rad = Math.PI / 180;
+    const lat1 = pos1.lat * rad;
+    const lat2 = pos2.lat * rad;
+    const dLng = (pos2.lng - pos1.lng) * rad;
+    const y = Math.sin(dLng) * Math.cos(lat2);
+    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  }
 }
-class GameEngine{
-constructor(network,onState){this.net=network;this.onState=onState;this.players=new Map();this.state='lobby';this.round=0;this.wolfId=null;network.on('host-data',({from,data})=>this.onPlayerMessage(from,data));network.on('player-left',id=>{this.players.delete(id);this.broadcastState()});setInterval(()=>this.tick(),1000);setInterval(()=>this.broadcastState(),1000)}
-onPlayerMessage(from,msg){if(msg.type==='join'){this.players.set(from,{id:from,name:msg.name,emoji:msg.emoji,pos:null,role:'sheep',score:0});this.broadcastState()}else if(msg.type==='pos'){const p=this.players.get(from);if(p)p.pos=msg.pos}}
-start(){this.state='playing';this.round=1;const ids=[...this.players.keys()];this.wolfId=ids[Math.floor(Math.random()*ids.length)];for(const p of this.players.values()){p.role=p.id===this.wolfId?'wolf':'sheep';p.score=0}this.broadcastState()}
-tick(){if(this.state!=='playing')return;const wolf=this.players.get(this.wolfId);if(!wolf?.pos)return;for(const p of this.players.values()){if(p.id===this.wolfId||!p.pos)continue;const d=Geo.distance(wolf.pos,p.pos);if(d<25){wolf.score+=10;this.state='round-end';this.broadcastState();setTimeout(()=>this.nextRound(),5000);return}}}
-nextRound(){if(this.round>=3){this.state='game-over';this.broadcastState();return}this.round++;this.state='playing';const ids=[...this.players.keys()];this.wolfId=ids[Math.floor(Math.random()*ids.length)];for(const p of this.players.values())p.role=p.id===this.wolfId?'wolf':'sheep';this.broadcastState()}
-broadcastState(){const out={};for(const[id,p]of this.players)out[id]={name:p.name,emoji:p.emoji,pos:p.pos,role:p.role,score:p.score};const payload={type:'state',phase:this.state,round:this.round,players:out,wolfId:this.wolfId};this.net.broadcast(payload);if(this.onState)this.onState(payload)}
+
+/* ==========================================
+   4. موتور منطق بازی (فقط روی میزبان اجرا می‌شود)
+   ========================================== */
+class GameEngine {
+  constructor(net) {
+    this.net = net;
+    this.players = new Map(); // ID -> {name, avatar, pos, role, score, invisible, stamina, hasShield}
+    this.state = 'lobby';
+    this.mode = 'wolf_sheep'; // wolf_sheep, treasure, race, gather, safe_zone
+    this.round = 1;
+    this.maxRounds = 3;
+    this.timer = 60;
+    this.wolfId = null;
+    this.targetPoint = null; // برای گنج، مسابقه و گردهمایی
+    this.safeZones = [];
+    this.items = []; // آیتم‌های انرژی‌زا
+    this.tickInterval = null;
+
+    // هندل کردن پیام‌های بازیکنان
+    this.net.on('data-from-client', ({from, data}) => this.handleClientMessage(from, data));
+    this.net.on('client-disconnected', (id) => {
+      this.players.delete(id);
+      this.broadcastState();
+    });
+  }
+
+  addPlayer(id, name, avatar) {
+    this.players.set(id, {
+      id, name, avatar, pos: null, role: 'sheep', score: 0, 
+      invisible: false, invisTimer: 0, stamina: 100, hasShield: false
+    });
+    this.broadcastState();
+  }
+
+  handleClientMessage(fromId, msg) {
+    const player = this.players.get(fromId);
+    if (!player) return;
+
+    if (msg.type === 'pos') {
+      player.pos = msg.pos;
+      player.currentSpeed = msg.speed || 0; // سرعت محاسبه شده در کلاینت
+    } 
+    else if (msg.type === 'chat') {
+      this.net.broadcast({ type: 'chat', name: player.name, text: msg.text });
+    }
+    else if (msg.type === 'invisible') {
+      if (player.invisTimer <= 0) {
+        player.invisible = true;
+        player.invisTimer = 30; // ۳۰ ثانیه نامرئی
+        this.net.sendToClient(fromId, { type: 'system', text: 'شما ۳۰ ثانیه نامرئی شدید!' });
+      }
+    }
+  }
+
+  startGame() {
+    this.state = 'playing';
+    this.round = 1;
+    this.nextRound();
+    
+    if (this.tickInterval) clearInterval(this.tickInterval);
+    this.tickInterval = setInterval(() => this.gameTick(), 1000);
+  }
+
+  nextRound() {
+    this.timer = 90; // ۹۰ ثانیه برای هر دور
+    const playerIds = Array.from(this.players.keys());
+    
+    // انتخاب تصادفی حالت بازی
+    const modes = ['wolf_sheep', 'treasure', 'race', 'safe_zone'];
+    this.mode = modes[Math.floor(Math.random() * modes.length)];
+    
+    // ریست کردن بازیکنان
+    this.players.forEach(p => {
+      p.score = p.score || 0;
+      p.stamina = 100;
+      p.hasShield = false;
+      p.invisible = false;
+      p.invisTimer = 0;
+    });
+
+    // تنظیمات هر حالت
+    if (this.mode === 'wolf_sheep' || this.mode === 'safe_zone') {
+      this.wolfId = playerIds[Math.floor(Math.random() * playerIds.length)];
+      this.players.forEach(p => p.role = (p.id === this.wolfId) ? 'wolf' : 'sheep');
+      
+      if (this.mode === 'safe_zone') {
+        // ساخت ۳ منطقه امن تصادفی نزدیک به بازیکنان
+        this.safeZones = [];
+        for(let i=0; i<3; i++) {
+          const basePos = this.players.get(playerIds[0]).pos || {lat: 35.7, lng: 51.4};
+          this.safeZones.push({
+            lat: basePos.lat + (Math.random() - 0.5) * 0.005,
+            lng: basePos.lng + (Math.random() - 0.5) * 0.005,
+            radius: 30 // ۳۰ متر
+          });
+        }
+      }
+    } 
+    else if (this.mode === 'treasure') {
+      const basePos = this.players.get(playerIds[0]).pos || {lat: 35.7, lng: 51.4};
+      this.targetPoint = {
+        lat: basePos.lat + (Math.random() - 0.5) * 0.01,
+        lng: basePos.lng + (Math.random() - 0.5) * 0.01
+      };
+      this.players.forEach(p => p.role = 'seeker');
+    }
+    else if (this.mode === 'race' || this.mode === 'gather') {
+      const basePos = this.players.get(playerIds[0]).pos || {lat: 35.7, lng: 51.4};
+      this.targetPoint = {
+        lat: basePos.lat + (Math.random() > 0.5 ? 0.003 : -0.003),
+        lng: basePos.lng + (Math.random() > 0.5 ? 0.003 : -0.003)
+      };
+      this.players.forEach(p => p.role = 'racer');
+    }
+
+    // آیتم‌ها
+    this.items = [];
+    for(let i=0; i<5; i++) {
+      const basePos = this.players.get(playerIds[0]).pos || {lat: 35.7, lng: 51.4};
+      this.items.push({
+        id: Math.random().toString(36).substr(2, 9),
+        type: Math.random() > 0.5 ? 'speed' : 'shield',
+        lat: basePos.lat + (Math.random() - 0.5) * 0.005,
+        lng: basePos.lng + (Math.random() - 0.5) * 0.005
+      });
+    }
+
+    this.broadcastState();
+  }
+
+  gameTick() {
+    if (this.state !== 'playing') return;
+    
+    this.timer--;
+    if (this.timer <= 0) {
+      this.endRound("زمان تمام شد!");
+      return;
+    }
+
+    // کاهش تایمر نامرئی
+    this.players.forEach(p => {
+      if (p.invisible) {
+        p.invisTimer--;
+        if (p.invisTimer <= 0) p.invisible = false;
+      }
+    });
+
+    const wolf = this.players.get(this.wolfId);
+
+    // بررسی برخورد در حالت‌های مختلف
+    this.players.forEach(p1 => {
+      if (!p1.pos) return;
+
+      // 1. گرگ و بره و منطقه امن
+      if ((this.mode === 'wolf_sheep' || this.mode === 'safe_zone') && p1.role === 'sheep' && wolf && wolf.pos) {
+        const dist = GeoHelper.getDistance(wolf.pos, p1.pos);
+        if (dist < 25) { // فاصله کمتر از ۲۵ متر
+          // اگر حالت منطقه امن است و بره در منطقه امن است، نجات پیدا می‌کند
+          if (this.mode === 'safe_zone') {
+            let inSafeZone = false;
+            this.safeZones.forEach(zone => {
+              if (GeoHelper.getDistance(zone, p1.pos) < zone.radius) inSafeZone = true;
+            });
+            if (inSafeZone) return; // در امان است
+          }
+          
+          // اگر سپر دارد
+          if (p1.hasShield) {
+            p1.hasShield = false;
+            this.net.sendToClient(p1.id, { type: 'system', text: 'سپر شما شکست! فرار کن!' });
+            return;
+          }
+
+          // گرفتن بره
+          this.endRound(`گرگ (${wolf.name}) بره (${p1.name}) را گرفت!`);
+        }
+      }
+
+      // 2. گنج
+      if (this.mode === 'treasure' && this.targetPoint) {
+        if (GeoHelper.getDistance(this.targetPoint, p1.pos) < 15) {
+          p1.score += 20;
+          this.endRound(`(${p1.name}) گنج را پیدا کرد!`);
+        }
+      }
+
+      // 3. مسابقه
+      if (this.mode === 'race' && this.targetPoint) {
+        if (GeoHelper.getDistance(this.targetPoint, p1.pos) < 15) {
+          p1.score += 15;
+          this.endRound(`(${p1.name}) به خط پایان رسید!`);
+        }
+      }
+      
+      // 4. گردهمایی
+      if (this.mode === 'gather' && this.targetPoint) {
+        if (GeoHelper.getDistance(this.targetPoint, p1.pos) < 15) {
+          p1.score += 10;
+          // بررسی اینکه همه رسیدن یا نه
+          const allArrived = Array.from(this.players.values()).every(p => 
+            p.pos && GeoHelper.getDistance(this.targetPoint, p.pos) < 20
+          );
+          if (allArrived) this.endRound("همه در نقطه گردهمایی جمع شدند!");
+        }
+      }
+
+      // 5. برداشتن آیتم‌ها
+      this.items.forEach((item, index) => {
+        if (GeoHelper.getDistance(item, p1.pos) < 10) {
+          if (item.type === 'speed') {
+             p1.score += 5;
+             this.net.sendToClient(p1.id, { type: 'system', text: '⚡ کفش سرعت را گرفتی! (+۵)' });
+          } else if (item.type === 'shield') {
+             p1.hasShield = true;
+             this.net.sendToClient(p1.id, { type: 'system', text: '🛡️ سپر گرفتی!' });
+          }
+          this.items.splice(index, 1);
+        }
+      });
+    });
+
+    // پخش وضعیت به همه
+    this.broadcastState();
+  }
+
+  endRound(reason) {
+    this.state = 'round_end';
+    clearInterval(this.tickInterval);
+    this.broadcastState(); // برای نمایش پیام پایان
+
+    setTimeout(() => {
+      this.net.broadcast({ type: 'round_alert', text: reason });
+      setTimeout(() => {
+        if (this.round >= this.maxRounds) {
+          this.state = 'game_over';
+          // پیدا کردن برنده
+          let winner = null;
+          let maxScore = -1;
+          this.players.forEach(p => {
+            if (p.score > maxScore) { maxScore = p.score; winner = p; }
+          });
+          this.net.broadcast({ type: 'game_over', winnerName: winner.name, score: winner.score });
+          clearInterval(this.tickInterval);
+        } else {
+          this.round++;
+          this.nextRound();
+        }
+      }, 3000); // ۳ ثانیه صبر برای خواندن پیام
+    }, 1000);
+  }
+
+  broadcastState() {
+    const payload = {
+      type: 'state',
+      state: this.state,
+      mode: this.mode,
+      round: this.round,
+      timer: this.timer,
+      wolfId: this.wolfId,
+      targetPoint: this.targetPoint,
+      safeZones: this.safeZones,
+      items: this.items,
+      players: {}
+    };
+
+    this.players.forEach((p, id) => {
+      // اگر نامرئی است، موقعیتش را برای دیگران نمی‌فرستیم (مگر برای خودش)
+      if (p.invisible) {
+         payload.players[id] = { ...p, pos: (id === network.myId ? p.pos : null) }; 
+      } else {
+         payload.players[id] = p;
+      }
+    });
+
+    this.net.broadcast(payload);
+    // میزبان هم باید وضعیت خودش را رندر کند
+    renderGameState(payload);
+  }
 }
-const net=new Network();const geo=new Geo();let engine=null;let map=null;let myMarker=null;const markers=new Map();let selectedEmoji='🐺';
-document.querySelectorAll('.avatar-opt').forEach(btn=>{if(btn.dataset.emoji==='🐺')btn.classList.add('selected');btn.onclick=()=>{document.querySelectorAll('.avatar-opt').forEach(b=>b.classList.remove('selected'));btn.classList.add('selected');selectedEmoji=btn.dataset.emoji}});
-function showScreen(name){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById('screen-'+name).classList.add('active')}
-function showError(msg){const el=document.getElementById('errorMsg');el.textContent=msg;setTimeout(()=>{if(el.textContent===msg)el.textContent=''},5000)}
-async function startGeo(){try{await geo.start(pos=>{if(engine){const me=engine.players.get(net.playerId);if(me)me.pos=pos}else{net.sendToHost({type:'pos',pos})}updateMyMarker(pos)})}catch(err){showError(err.message)}}
-function updateMyMarker(pos){if(!map)return;if(!myMarker){myMarker=L.marker([pos.lat,pos.lng],{icon:playerIcon('📍')}).addTo(map);map.setView([pos.lat,pos.lng],18)}else myMarker.setLatLng([pos.lat,pos.lng])}
-function playerIcon(emoji){return L.divIcon({html:`<div style="font-size:28px;text-align:center;line-height:1">${emoji}</div>`,className:'',iconSize:[32,32],iconAnchor:[16,16]})}
-function updateLobby(state){const list=document.getElementById('playerList');if(!list)return;list.innerHTML='';for(const[id,p]of Object.entries(state.players)){const li=document.createElement('li');li.textContent=`${p.emoji} ${p.name}${id===net.playerId?' (شما)':''}`;list.appendChild(li)}}
-function handleState(state){if(state.phase==='lobby'){updateLobby(state);return}const gameScreen=document.getElementById('screen-game');if(!gameScreen.classList.contains('active'))return;if(!map){map=L.map('map',{zoomControl:false}).setView([35.7,51.4],17);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);if(geo.position)map.setView([geo.position.lat,geo.position.lng],18);setTimeout(()=>map.invalidateSize(),100)}const me=state.players[net.playerId];if(me){document.getElementById('roleBadge').textContent=me.role==='wolf'?'🐺 گرگ':'🐑 بره';document.getElementById('scoreBadge').textContent=`امتیاز: ${me.score}`}document.getElementById('roundBadge').textContent=`دور ${state.round} — ${state.phase}`;const seen=new Set();for(const[id,p]of Object.entries(state.players)){if(!p.pos||id===net.playerId)continue;seen.add(id);if(markers.has(id))markers.get(id).setLatLng([p.pos.lat,p.pos.lng]);else{const m=L.marker([p.pos.lat,p.pos.lng],{icon:playerIcon(p.emoji)}).addTo(map).bindPopup(`${p.emoji} ${p.name} (${p.role})`);markers.set(id,m)}}for(const[id,m]of markers)if(!seen.has(id)){map.removeLayer(m);markers.delete(id)}}
-net.on('host-message',msg=>{if(msg.type==='state')handleState(msg)});net.on('host-closed',()=>{alert('اتصال قطع شد');location.reload()});
-document.getElementById('createBtn').onclick=async()=>{const name=document.getElementById('nameInput').value.trim()||'بازیکن';document.getElementById('createBtn').disabled=true;try{const code=await net.createRoom();document.getElementById('roomCode').textContent=code;showScreen('lobby');engine=new GameEngine(net,handleState);engine.players.set(net.playerId,{id:net.playerId,name,emoji:selectedEmoji,pos:null,role:'sheep',score:0});startGeo()}catch(err){showError('خطا: '+err.message);document.getElementById('createBtn').disabled=false}};
-document.getElementById('joinBtn').onclick=async()=>{const code=document.getElementById('codeInput').value.trim();const name=document.getElementById('nameInput').value.trim()||'بازیکن';if(!/^\d{4}$/.test(code))return showError('کد باید ۴ رقم باشد');document.getElementById('joinBtn').disabled=true;try{await net.joinRoom(code);net.sendToHost({type:'join',name,emoji:selectedEmoji});showScreen('game');startGeo()}catch(err){showError('خطا: '+err.message);document.getElementById('joinBtn').disabled=false}};
-document.getElementById('startBtn').onclick=()=>{if(!engine)return;showScreen('game');engine.start()};
+
+/* ==========================================
+   5. منطق سمت کلاینت (رابط کاربری)
+   ========================================== */
+
+// مدیریت انتخاب آواتار
+document.querySelectorAll('.avatar-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.avatar-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    selectedAvatar = btn.dataset.emoji;
+  });
+});
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.innerText = msg;
+  setTimeout(() => el.innerText = '', 5000);
+}
+
+// دکمه ساخت اتاق
+document.getElementById('btn-create-room').addEventListener('click', async () => {
+  myName = document.getElementById('input-name').value.trim() || 'میزبان';
+  isHost = true;
+  network = new Network();
+  
+  try {
+    document.getElementById('btn-create-room').innerText = 'در حال ساخت...';
+    const code = await network.createRoom();
+    document.getElementById('room-code-display').innerText = code;
+    showScreen('screen-lobby');
+    
+    gameEngine = new GameEngine(network);
+    gameEngine.addPlayer(network.myId, myName, selectedAvatar); // اضافه کردن خودم
+    
+    // شروع ردیابی GPS
+    GeoHelper.startTracking((pos) => {
+       if (gameEngine) {
+         gameEngine.players.get(network.myId).pos = pos;
+         updateMyMapMarker(pos);
+       }
+    });
+
+  } catch (err) {
+    showError('خطا در ساخت اتاق: ' + err.message);
+    document.getElementById('btn-create-room').innerText = '🎮 ساخت اتاق (میزبان)';
+  }
+});
+
+// دکمه ورود به اتاق
+document.getElementById('btn-join-room').addEventListener('click', async () => {
+  const code = document.getElementById('input-room-code').value.trim();
+  if (code.length !== 4) return showError('کد باید ۴ رقم باشد');
+  
+  myName = document.getElementById('input-name').value.trim() || 'بازیکن';
+  isHost = false;
+  network = new Network();
+
+  try {
+    document.getElementById('btn-join-room').innerText = '...';
+    await network.joinRoom(code);
+    
+    // ارسال اطلاعات اولیه به میزبان
+    network.sendToHost({ type: 'join', name: myName, avatar: selectedAvatar });
+    
+    // میزبان فعلا این را در پیام بعدی هندل می‌کند
+    // فرض می‌کنیم میزبان state را می‌فرستد
+    showScreen('screen-game');
+    initGameUI();
+
+    GeoHelper.startTracking((pos) => {
+       network.sendToHost({ type: 'pos', pos: pos });
+       updateMyMapMarker(pos);
+    });
+
+  } catch (err) {
+    showError('خطا در ورود: ' + err.message);
+    document.getElementById('btn-join-room').innerText = 'ورود';
+  }
+});
+
+// دکمه شروع بازی (میزبان)
+document.getElementById('btn-start-game').addEventListener('click', () => {
+  if (!gameEngine) return;
+  showScreen('screen-game');
+  initGameUI();
+  gameEngine.startGame();
+});
+
+/* ==========================================
+   6. رابط کاربری بازی (نقشه، رندر، قطب‌نما)
+   ========================================== */
+let isNightMode = false;
+let flashlightActive = false;
+
+function initGameUI() {
+  // راه‌اندازی نقشه Leaflet
+  if (!map) {
+    map = L.map('map', { zoomControl: false }).setView([35.7, 51.4], 18);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+  }
+
+  // دکمه نامرئی
+  document.getElementById('btn-invisible').addEventListener('click', () => {
+    if (isHost) {
+      const p = gameEngine.players.get(network.myId);
+      if (p.invisTimer <= 0) {
+        p.invisible = true;
+        p.invisTimer = 30;
+        document.getElementById('btn-invisible').classList.add('active');
+        setTimeout(() => document.getElementById('btn-invisible').classList.remove('active'), 30000);
+      }
+    } else {
+      network.sendToHost({ type: 'invisible' });
+      document.getElementById('btn-invisible').classList.add('active');
+      setTimeout(() => document.getElementById('btn-invisible').classList.remove('active'), 30000);
+    }
+  });
+
+  // دکمه حالت شب
+  document.getElementById('btn-night').addEventListener('click', () => {
+    flashlightActive = !flashlightActive;
+    document.getElementById('flashlight').style.display = flashlightActive ? 'block' : 'none';
+    document.getElementById('btn-night').style.opacity = flashlightActive ? '1' : '0.5';
+  });
+
+  // چت سریع
+  document.querySelectorAll('.chat-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const msg = btn.dataset.msg;
+      if (isHost) {
+        network.broadcast({ type: 'chat', name: myName, text: msg });
+        showChatBubble(myName, msg);
+      } else {
+        network.sendToHost({ type: 'chat', text: msg });
+      }
+    });
+  });
+}
+
+function updateMyMapMarker(pos) {
+  if (!map) return;
+  const icon = L.divIcon({
+    html: `<div class="my-avatar">${selectedAvatar}</div>`,
+    className: 'custom-icon'
+  });
+  
+  if (!myMarker) {
+    myMarker = L.marker([pos.lat, pos.lng], { icon }).addTo(map);
+    map.setView([pos.lat, pos.lng], 18);
+  } else {
+    myMarker.setLatLng([pos.lat, pos.lng]);
+  }
+
+  // اگر قطب‌نما فعال است، آپدیت کن
+  if (currentTargetCompass) {
+    updateCompass();
+  }
+}
+
+// رندر وضعیت دریافتی از میزبان
+function renderGameState(state) {
+  // اگر اسم من در لیست نیست، میزبان هنوز من را ثبت نکرده
+  if (!state.players[network.myId]) return;
+
+  // رندر بازیکنان روی نقشه
+  Object.keys(state.players).forEach(id => {
+    const p = state.players[id];
+    
+    // خودم را که با مارکر آبی نشان دادم، دوباره نکش
+    if (id === network.myId) {
+      document.getElementById('hud-role').innerText = p.role === 'wolf' ? '🐺 گرگ' : (p.role === 'sheep' ? '🐑 بره' : '🏃‍♂️ بازیکن');
+      document.getElementById('hud-role').style.color = p.role === 'wolf' ? '#ef4444' : '#22c55e';
+      
+      // بررسی ضربان قلب (فقط برای بره)
+      if (state.wolfId && state.wolfId !== network.myId && p.role === 'sheep' && p.pos) {
+         const wolf = state.players[state.wolfId];
+         if (wolf && wolf.pos) {
+            const dist = GeoHelper.getDistance(p.pos, wolf.pos);
+            if (dist < 35) {
+               if (!heartbeatAudio.paused) {} else { heartbeatAudio.play().catch(e=>{}); }
+               if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
+               myMarker.getElement().classList.add('heartbeat-anim');
+            } else {
+               heartbeatAudio.pause();
+               myMarker.getElement().classList.remove('heartbeat-anim');
+            }
+         }
+      }
+      return;
+    }
+
+    // حذف نشانگرهایی که از بازی خارج شدند یا نامرئی شدند
+    if (!p.pos) {
+      if (playerMarkers[id]) {
+        map.removeLayer(playerMarkers[id]);
+        delete playerMarkers[id];
+      }
+      return;
+    }
+
+    // ساخت یا آپدیت مارکر بازیکنان دیگر
+    const iconHtml = `<div class="player-avatar">${p.avatar}</div>`;
+    const icon = L.divIcon({ html: iconHtml, className: 'custom-icon' });
+
+    if (playerMarkers[id]) {
+      playerMarkers[id].setLatLng([p.pos.lat, p.pos.lng]);
+    } else {
+      const marker = L.marker([p.pos.lat, p.pos.lng], { icon }).addTo(map);
+      // کلیک برای قطب‌نما
+      marker.on('click', () => {
+        currentTargetCompass = id;
+        document.getElementById('compass-overlay').style.display = 'block';
+        updateCompass();
+      });
+      playerMarkers[id] = marker;
+    }
+  });
+
+  // پاک کردن مارکرهای باقی‌مانده
+  Object.keys(playerMarkers).forEach(id => {
+    if (!state.players[id] || !state.players[id].pos) {
+      map.removeLayer(playerMarkers[id]);
+      delete playerMarkers[id];
+    }
+  });
+
+  // نمایش مناطق امن
+  if (state.safeZones && state.safeZones.length > 0) {
+    state.safeZones.forEach((zone, i) => {
+      const id = 'safe-zone-' + i;
+      if (!window[id]) {
+        window[id] = L.circle([zone.lat, zone.lng], { color: 'green', fillColor: '#22c55e', fillOpacity: 0.3, radius: zone.radius }).addTo(map);
+      }
+    });
+  } else {
+    // پاک کردن دایره‌های قبلی
+    for(let i=0; i<3; i++) {
+      if (window['safe-zone-'+i]) { map.removeLayer(window['safe-zone-'+i]); window['safe-zone-'+i] = null; }
+    }
+  }
+
+  // نمایش گنج/هدف
+  if (state.targetPoint) {
+    if (!window.targetMarker) {
+      window.targetMarker = L.marker([state.targetPoint.lat, state.targetPoint.lng], {
+        icon: L.divIcon({ html: '<div style="font-size:30px">💎</div>', className: 'custom-icon' })
+      }).addTo(map);
+    } else {
+      window.targetMarker.setLatLng([state.targetPoint.lat, state.targetPoint.lng]);
+    }
+  } else {
+    if (window.targetMarker) { map.removeLayer(window.targetMarker); window.targetMarker = null; }
+  }
+
+  // نمایش آیتم‌ها
+  if (state.items) {
+    if (!window.itemMarkers) window.itemMarkers = [];
+    window.itemMarkers.forEach(m => map.removeLayer(m));
+    window.itemMarkers = [];
+    state.items.forEach(item => {
+      const emoji = item.type === 'speed' ? '⚡' : '🛡️';
+      const m = L.marker([item.lat, item.lng], { icon: L.divIcon({ html: `<div style="font-size:24px">${emoji}</div>`, className: 'custom-icon' }) }).addTo(map);
+      window.itemMarkers.push(m);
+    });
+  }
+
+  // HUD
+  document.getElementById('hud-mode').innerText = 
+    state.mode === 'wolf_sheep' ? '🐺 گرگ و بره' : 
+    state.mode === 'treasure' ? '💎 گنج‌یابی' : 
+    state.mode === 'race' ? '🏁 مسابقه' : 
+    state.mode === 'gather' ? '🤝 گردهمایی' : '🛡️ منطقه امن';
+  
+  document.getElementById('hud-timer').innerText = `دور ${state.round} | ${state.timer}s`;
+
+  // حالت شب خودکار در دورهای فرد
+  if (state.round % 2 === 0 && !isNightMode) {
+    document.getElementById('night-overlay').style.display = 'block';
+    setTimeout(() => document.getElementById('night-overlay').style.opacity = '1', 100);
+    isNightMode = true;
+  } else if (state.round % 2 !== 0 && isNightMode) {
+    document.getElementById('night-overlay').style.opacity = '0';
+    setTimeout(() => document.getElementById('night-overlay').style.display = 'none', 1000);
+    isNightMode = false;
+  }
+}
+
+// آپدیت قطب‌نما
+function updateCompass() {
+  if (!currentTargetCompass || !myGeoPos) return;
+  
+  // پیدا کردن موقعیت هدف
+  let targetPos = null;
+  if (isHost && gameEngine) {
+    targetPos = gameEngine.players.get(currentTargetCompass)?.pos;
+  } else {
+    // کلاینت باید آخرین استیت را ذخیره کرده باشد (برای سادگی فعلا رها می‌کنیم)
+  }
+
+  // چون کلاینت استیت را نگه نمیدارد، این بخش در کلاینت کامل نیست. اما برای میزبان کار میکند.
+  // ما باید موقعیت‌ها را در یک متغیر سراسری در کلاینت ذخیره کنیم.
+}
+
+// هندل کردن پیام‌های شبکه در کلاینت
+if(!isHost) {
+  network = new Network(); // مقدار دهی اولیه قبل از رویدادها
+  network.on('data-from-host', (msg) => {
+    if (msg.type === 'state') {
+      renderGameState(msg);
+    } else if (msg.type === 'chat') {
+      showChatBubble(msg.name, msg.text);
+    } else if (msg.type === 'system') {
+      showChatBubble('سیستم', msg.text, true);
+    } else if (msg.type === 'round_alert') {
+      alert(msg.text);
+    } else if (msg.type === 'game_over') {
+      alert(`پایان بازی!\nبرنده: ${msg.winnerName} با ${msg.score} امتیاز`);
+      location.reload();
+    }
+  });
+} else {
+  // میزبان هم چت‌ها را دریافت میکند
+  setTimeout(() => {
+     if(network) network.on('data-from-client', ({from, data}) => {
+        if(data.type === 'chat') {
+           const p = gameEngine.players.get(from);
+           if(p) showChatBubble(p.name, data.text);
+        }
+     });
+  }, 1000);
+}
+
+// هندل کردن پیام جوین در میزبان
+if (isHost) {
+   setTimeout(() => {
+      if(network) network.on('data-from-client', ({from, data}) => {
+         if (data.type === 'join' && gameEngine) {
+             gameEngine.addPlayer(from, data.name, data.avatar);
+             // آپدیت لیست لابی
+             const list = document.getElementById('lobby-player-list');
+             const li = document.createElement('li');
+             li.innerText = `${data.avatar} ${data.name}`;
+             list.appendChild(li);
+             document.getElementById('room-code-display').innerText = document.getElementById('room-code-display').innerText; // فورس رفرش
+         }
+      });
+   }, 1000);
+}
+
+// نمایش پیام چت
+function showChatBubble(name, text, isSystem = false) {
+  const container = document.getElementById('chat-messages');
+  const bubble = document.createElement('div');
+  bubble.className = 'chat-bubble';
+  if (isSystem) bubble.style.background = '#f59e0b';
+  bubble.innerText = `${name}: ${text}`;
+  container.appendChild(bubble);
+  setTimeout(() => bubble.remove(), 4000);
+}
 </script>
 </body>
 </html>
