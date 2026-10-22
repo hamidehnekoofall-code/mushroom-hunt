@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>رادار زنده - قایم موشک</title>
+<title>رادار قایم موشک</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; -webkit-tap-highlight-color: transparent; }
@@ -12,35 +12,39 @@
   .screen { display: none; flex-direction: column; height: 100vh; padding: 20px; align-items: center; justify-content: center; z-index: 10; }
   .screen.active { display: flex; }
 
-  h1 { color: #38bdf8; margin-bottom: 20px; }
+  h1 { color: #38bdf8; margin-bottom: 20px; font-size: 28px; }
   input { width: 90%; max-width: 300px; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #334155; background: #1e293b; color: white; font-size: 16px; text-align: center; }
   
   .avatars { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin: 15px 0; }
-  .avatars button { font-size: 24px; background: #1e293b; border: 2px solid transparent; border-radius: 8px; padding: 5px 10px; cursor: pointer; }
-  .avatars button.active { border-color: #38bdf8; background: #0ea5e9; }
+  .avatars button { font-size: 24px; background: #1e293b; border: 2px solid transparent; border-radius: 8px; padding: 5px 10px; cursor: pointer; transition: 0.2s; }
+  .avatars button.active { border-color: #38bdf8; background: #0ea5e9; transform: scale(1.1); }
 
-  .btn { width: 90%; max-width: 300px; padding: 15px; margin: 5px 0; border-radius: 8px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; }
+  .btn { width: 90%; max-width: 300px; padding: 15px; margin: 5px 0; border-radius: 8px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
   .btn-create { background: #22c55e; color: white; }
+  .btn-create:hover { background: #16a34a; }
   .btn-join { background: #38bdf8; color: #0f172a; display: flex; padding: 0; }
   .btn-join input { width: 50%; margin: 0; border-radius: 8px 0 0 8px; }
   .btn-join button { width: 50%; border-radius: 0 8px 8px 0; background: #0284c7; color: white; }
 
-  /* Game UI */
   #screen-game { padding: 0; display: none; position: relative; }
   #map { width: 100%; height: 100vh; z-index: 1; }
   
   #hud { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; z-index: 1000; pointer-events: none; }
-  .hud-box { background: rgba(15, 23, 42, 0.9); padding: 8px 15px; border-radius: 20px; font-size: 14px; border: 1px solid #334155; }
+  .hud-box { background: rgba(15, 23, 42, 0.9); padding: 8px 15px; border-radius: 20px; font-size: 14px; border: 1px solid #334155; backdrop-filter: blur(5px); }
   #room-code { color: #38bdf8; font-weight: bold; }
 
-  /* Compass */
-  #compass-box { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(15, 23, 42, 0.9); padding: 10px 20px; border-radius: 20px; border: 1px solid #38bdf8; z-index: 1000; display: none; text-align: center; }
+  #compass-box { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(15, 23, 42, 0.9); padding: 10px 20px; border-radius: 20px; border: 1px solid #38bdf8; z-index: 1000; display: none; text-align: center; backdrop-filter: blur(5px); }
   #arrow { font-size: 30px; display: inline-block; transition: transform 0.2s; }
+  #dist-text { font-size: 14px; margin-top: 5px; }
+
+  .leaflet-div-icon { background: transparent; border: none; }
+  .player-emoji { font-size: 28px; text-align: center; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+  .my-emoji { font-size: 32px; text-align: center; filter: drop-shadow(0 0 8px #38bdf8); animation: pulse 2s infinite; }
+  @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.15); } 100% { transform: scale(1); } }
 </style>
 </head>
 <body>
 
-<!-- صفحه ورود -->
 <div id="screen-home" class="screen active">
   <h1>📍 رادار قایم موشک</h1>
   <input type="text" id="name" placeholder="اسم شما..." value="بازیکن">
@@ -51,6 +55,7 @@
     <button data-emoji="🦊">🦊</button>
     <button data-emoji="🐻">🐻</button>
     <button data-emoji="🐸">🐸</button>
+    <button data-emoji="👻">👻</button>
   </div>
 
   <button class="btn btn-create" id="btn-create">ساخت اتاق (میزبان)</button>
@@ -59,43 +64,29 @@
     <input type="text" id="code" placeholder="کد ۴ رقمی" maxlength="4">
     <button id="btn-join">ورود</button>
   </div>
-  <p id="error" style="color: red; margin-top: 10px;"></p>
+  <p id="error" style="color: #ef4444; margin-top: 10px; min-height: 20px;"></p>
 </div>
 
-<!-- صفحه بازی -->
 <div id="screen-game" class="screen">
   <div id="map"></div>
   <div id="hud">
-    <div class="hud-box">کد اتاق: <span id="room-code">----</span></div>
+    <div class="hud-box">کد: <span id="room-code">----</span></div>
     <div class="hud-box" id="player-count">بازیکنان: 1</div>
   </div>
   <div id="compass-box">
     <div id="arrow">⬆️</div>
-    <div id="dist-text" style="font-size: 14px; margin-top: 5px;">0 متر</div>
+    <div id="dist-text">0 متر</div>
   </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
-// --- تنظیمات ---
-const PREFIX = 'radar-v1-';
-let peer = null;
-let conns = []; // برای میزبان
-let hostConn = null; // برای بازیکن
-let isHost = false;
-let myName = 'بازیکن';
-let myEmoji = '🐺';
-let myId = null;
-let myPos = null;
+const PREFIX = 'radar-v2-';
+let peer = null, conns = [], hostConn = null;
+let isHost = false, myName = 'بازیکن', myEmoji = '🐺', myId = null, myPos = null;
+let map = null, markers = {}, myMarker = null, playersData = {}, compassTarget = null;
 
-let map = null;
-let markers = {}; // مارکر بازیکنان
-let myMarker = null;
-let playersData = {}; // اطلاعات همه بازیکنان
-let compassTarget = null;
-
-// --- انتخاب آواتار ---
 document.querySelectorAll('#avatar-list button').forEach(btn => {
   btn.onclick = () => {
     document.querySelectorAll('#avatar-list button').forEach(b => b.classList.remove('active'));
@@ -104,11 +95,16 @@ document.querySelectorAll('#avatar-list button').forEach(btn => {
   };
 });
 
-// --- شبکه (P2P) ---
+function showError(msg) {
+  document.getElementById('error').innerText = msg;
+  setTimeout(() => document.getElementById('error').innerText = '', 4000);
+}
+
 function createRoom() {
-  myName = document.getElementById('name').value || 'میزبان';
+  myName = document.getElementById('name').value.trim() || 'میزبان';
   isHost = true;
   document.getElementById('btn-create').innerText = 'در حال اتصال...';
+  document.getElementById('btn-create').disabled = true;
   
   const code = Math.floor(1000 + Math.random() * 9000).toString();
   peer = new Peer(PREFIX + code);
@@ -121,10 +117,7 @@ function createRoom() {
     initMap();
     startGPS();
     
-    // ارسال وضعیت به بازیکنان جدید
-    setInterval(() => {
-      broadcast({ type: 'state', players: playersData });
-    }, 1000);
+    setInterval(() => broadcast({ type: 'state', players: playersData }), 1000);
   });
 
   peer.on('connection', (conn) => {
@@ -134,9 +127,7 @@ function createRoom() {
         playersData[conn.peer] = { name: data.name, emoji: data.emoji, pos: null };
         updatePlayerCount();
       } else if (data.type === 'pos') {
-        if(playersData[conn.peer]) {
-          playersData[conn.peer].pos = data.pos;
-        }
+        if(playersData[conn.peer]) playersData[conn.peer].pos = data.pos;
       }
     });
     conn.on('close', () => {
@@ -147,16 +138,17 @@ function createRoom() {
     });
   });
   
-  peer.on('error', () => {
+  peer.on('error', (err) => {
     document.getElementById('btn-create').innerText = 'ساخت اتاق (میزبان)';
-    document.getElementById('error').innerText = 'خطا در اتصال به سرور! دوباره تلاش کنید.';
+    document.getElementById('btn-create').disabled = false;
+    showError('خطا در اتصال به سرور! دوباره تلاش کنید.');
   });
 }
 
 function joinRoom() {
-  myName = document.getElementById('name').value || 'بازیکن';
-  const code = document.getElementById('code').value;
-  if (code.length !== 4) return document.getElementById('error').innerText = 'کد باید ۴ رقم باشد';
+  myName = document.getElementById('name').value.trim() || 'بازیکن';
+  const code = document.getElementById('code').value.trim();
+  if (code.length !== 4) return showError('کد باید ۴ رقم باشد');
   
   isHost = false;
   document.getElementById('btn-join').innerText = '...';
@@ -179,6 +171,7 @@ function joinRoom() {
       if (data.type === 'state') {
         playersData = data.players;
         renderPlayers();
+        updatePlayerCount();
       }
     });
     
@@ -190,47 +183,41 @@ function joinRoom() {
 
   peer.on('error', (err) => {
     document.getElementById('btn-join').innerText = 'ورود';
-    document.getElementById('error').innerText = 'اتاق پیدا نشد یا خطا در اتصال!';
+    showError('اتاق پیدا نشد یا خطا در اتصال!');
   });
 }
 
-function broadcast(msg) {
-  conns.forEach(c => { if(c.open) c.send(msg); });
-}
+function broadcast(msg) { conns.forEach(c => { if(c.open) c.send(msg); }); }
 
-// --- GPS و نقشه ---
 function startGPS() {
   if (!navigator.geolocation) return alert('GPS پشتیبانی نمی‌شود');
   
   navigator.geolocation.watchPosition(
     (pos) => {
       myPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      
-      // اضافه کردن خودم به لیست بازیکنان
       playersData[myId] = { name: myName, emoji: myEmoji, pos: myPos };
       
       if (isHost) {
-         broadcast({ type: 'state', players: playersData });
-         renderPlayers();
+        broadcast({ type: 'state', players: playersData });
+        renderPlayers();
+        updatePlayerCount();
       } else {
-         hostConn.send({ type: 'pos', pos: myPos });
-         renderPlayers(); // برای رندر خودم
+        hostConn.send({ type: 'pos', pos: myPos });
+        renderPlayers();
       }
     },
-    (err) => console.log(err),
+    (err) => console.log('GPS Error:', err),
     { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
   );
 }
 
 function initMap() {
-  map = L.map('map', { zoomControl: false }).setView([35.7, 51.4], 19); // زوم خیلی نزدیک برای محیط کوچک
+  map = L.map('map', { zoomControl: false }).setView([35.7, 51.4], 19);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20 }).addTo(map);
 }
 
 function renderPlayers() {
   if (!map || !myPos) return;
-
-  // تنظیم مرکز نقشه روی خودم
   map.setView([myPos.lat, myPos.lng], map.getZoom());
 
   Object.keys(playersData).forEach(id => {
@@ -238,16 +225,14 @@ function renderPlayers() {
     if (!p.pos) return;
 
     const isMe = (id === myId);
-    const iconHtml = `<div style="font-size: ${isMe ? '32px' : '24px'}; filter: ${isMe ? 'drop-shadow(0 0 8px #38bdf8)' : 'none'}; text-align: center;">${p.emoji}</div>`;
-    const icon = L.divIcon({ html: iconHtml, className: '', iconSize: [30, 30], iconAnchor: [15, 15] });
+    const iconHtml = `<div class="${isMe ? 'my-emoji' : 'player-emoji'}">${p.emoji}</div>`;
+    const icon = L.divIcon({ html: iconHtml, className: 'leaflet-div-icon', iconSize: [30, 30], iconAnchor: [15, 15] });
 
     if (markers[id]) {
       markers[id].setLatLng([p.pos.lat, p.pos.lng]);
     } else {
       const marker = L.marker([p.pos.lat, p.pos.lng], { icon }).addTo(map);
-      
       if (!isMe) {
-        // کلیک برای فعال کردن قطب نما
         marker.on('click', () => {
           compassTarget = id;
           document.getElementById('compass-box').style.display = 'block';
@@ -258,25 +243,19 @@ function renderPlayers() {
     }
   });
 
-  // بررسی فاصله برای لرزش
-  if (compassTarget && playersData[compassTarget] && playersData[compassTarget].pos && myPos) {
-    updateCompass();
-  }
+  if (compassTarget && playersData[compassTarget]?.pos && myPos) updateCompass();
 }
 
 function updateCompass() {
   const target = playersData[compassTarget];
-  if (!target || !target.pos) return;
+  if (!target?.pos) return;
 
-  // محاسبه فاصله (متر)
-  const R = 6371e3;
-  const rad = Math.PI / 180;
+  const R = 6371e3, rad = Math.PI / 180;
   const dLat = (target.pos.lat - myPos.lat) * rad;
   const dLng = (target.pos.lng - myPos.lng) * rad;
   const a = Math.sin(dLat/2)**2 + Math.cos(myPos.lat*rad)*Math.cos(target.pos.lat*rad)*Math.sin(dLng/2)**2;
   const dist = 2 * R * Math.asin(Math.sqrt(a));
 
-  // محاسبه زاویه
   const y = Math.sin(dLng) * Math.cos(target.pos.lat * rad);
   const x = Math.cos(myPos.lat * rad) * Math.sin(target.pos.lat * rad) - Math.sin(myPos.lat * rad) * Math.cos(target.pos.lat * rad) * Math.cos(dLng);
   const bearing = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
@@ -284,17 +263,13 @@ function updateCompass() {
   document.getElementById('arrow').style.transform = `rotate(${bearing}deg)`;
   document.getElementById('dist-text').innerText = `فاصله: ${Math.round(dist)} متر`;
 
-  // اگر کمتر از ۱۰ متر بود بلرزون!
-  if (dist < 10) {
-    if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
-  }
+  if (dist < 10 && navigator.vibrate) navigator.vibrate([200, 100, 200]);
 }
 
 function updatePlayerCount() {
   document.getElementById('player-count').innerText = `بازیکنان: ${Object.keys(playersData).length}`;
 }
 
-// --- دکمه‌ها ---
 document.getElementById('btn-create').onclick = createRoom;
 document.getElementById('btn-join').onclick = joinRoom;
 </script>
